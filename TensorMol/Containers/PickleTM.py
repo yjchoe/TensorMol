@@ -1,4 +1,7 @@
 from __future__ import absolute_import
+#kan
+from ..Util import *
+#kan
 import pickle,sys
 if sys.version_info > (3, 0):
 	import copyreg
@@ -32,7 +35,10 @@ def PickleMapName(name):
 def mapped_load_global(self):
 	module = PickleMapName(self.readline()[:-1])
 	name = PickleMapName(self.readline()[:-1])
-	print("Finding ", module,name)
+	#kan
+	#print("Finding ", module,name)
+	LOGGER.debug("Containers: mapped_load_global: found "+module+' '+name)
+	#kan
 	klass = self.find_class(module, name)
 	self.append(klass)
 
@@ -55,9 +61,15 @@ def UnPickleTM(file):
 		f.close()
 	else:
 		f = open(file,"rb")
-		unpickler = MyUnpickler(f,encoding='latin1')
-		tmp = unpickler.load()
-		f.close()
+		#kan unpickler = MyUnpickler(f,encoding='latin1')
+		#kan tmp = unpickler.load()
+		#kan f.close()
+		try:
+			unpickler = MyUnpickler(f,encoding='latin1')
+			tmp = unpickler.load()
+		except EOFError:
+			f.close()
+			return tmp
 	tmp.pop('evaluate',None)
 	tmp.pop('MolInstance_fc_sqdiff_BP',None)
 	tmp.pop('Eval_BPForceSingle',None)

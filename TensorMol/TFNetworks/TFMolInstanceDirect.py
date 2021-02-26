@@ -411,8 +411,33 @@ class MolInstance_DirectBP_NoGrad(MolInstance_fc_sqdiff_BP):
 			init = tf.global_variables_initializer()
 			self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
 			self.saver = tf.train.Saver(max_to_keep = self.max_checkpoints)
-			self.summary_writer = tf.summary.FileWriter(self.train_dir, self.sess.graph)
+			#kan implement restart from checkpoint
+			ckpt = tf.train.get_checkpoint_state(self.train_dir) # kan
 			self.sess.run(init)
+			if ckpt and ckpt.model_checkpoint_path:          
+				print("continue_training")
+				print(ckpt.model_checkpoint_path)
+				chkfile = ckpt.model_checkpoint_path
+				#chknum = int(chkfile.replace(self.name+'-chk-','')))
+				chknum = chkfile.replace(self.name+'-chk-','')
+				print("chknum ", chknum) # kan
+				chknum2 = chknum.replace(self.name,'')
+				print("chknum2 ", chknum2) # kan
+				self.chk_start = int(chknum2.replace('./networks//',''))
+				#self.saver.restore(self.sess, self.chk_file)
+				self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+				print("Start from:", self.chk_start) # kan
+				#sys.exit()
+			self.summary_writer = tf.summary.FileWriter(self.train_dir, self.sess.graph)
+			if (PARAMS["Profiling"]>0):
+				print("logging with FULL TRACE")
+				self.options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+				self.run_metadata = tf.RunMetadata()
+				self.summary_writer.add_run_metadata(self.run_metadata, "init", global_step=None)
+			self.sess.graph.finalize()
+			#kan implement restart from checkpoint
+
+			self.summary_writer = tf.summary.FileWriter(self.train_dir, self.sess.graph)
 			#self.options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
 			#self.run_metadata = tf.RunMetadata()
 		return

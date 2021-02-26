@@ -146,6 +146,23 @@ class MSet:
 	def BondTypes(self):
 		return np.asarray([x for x in itertools.product(self.AtomTypes().tolist(), repeat=2)])
 
+	def read_gaussian_xyz_w_prop_set(self, path,properties=[]): #kan
+                """
+                Reads a set of .log files from a directory and add them to the set.mols list
+                Args:
+                        path (string): The location of the output files to be read
+                        Currently  energy", forces", dipole are read
+                """
+                from os import listdir
+                from os.path import isfile, join
+                onlyfiles = [f for f in listdir(path) if isfile(join(path, f))]
+                for file in onlyfiles:
+                        if ( file[-4:]!='.log' ):
+                        	continue
+                        self.mols.append(Mol())
+                        self.mols[-1].read_gaussian_xyz_w_prop(path+file) 
+                return
+
 	def read_xyz_set_with_properties(self, path, properties=[]):
 		"""
 		Reads xyz files from a directory with properties in the comment line and adds them to the
@@ -225,11 +242,14 @@ class MSet:
 				else:
 					raise Exception("Unknown Type!")
 				self.mols[-1].FromXYZString(''.join(txts[line0:line0+nlines+2]))
+                                # kan properties cannot be obtained in the next 2 lines
 				self.mols[-1].name = str(txts[line0+1])
 				self.mols[-1].properties["set_name"] = self.name
+                                #print(" kan self.mols[-1].name", self.mols[-1].name)
+                                #print(" kan ", self.name)
 		if (self.center):
 			self.CenterSet()
-		LOGGER.debug("Read "+str(len(self.mols))+" molecules from XYZ")
+		LOGGER.debug("Set:ReadXYZ: Read "+str(len(self.mols))+" molecules from XYZ")
 		return
 
 	def AppendFromDirectory(self, apath_):
@@ -326,7 +346,8 @@ class MSet:
 		s = MSet(self.name+"_cleaned")
 		s.path = self.path
 		for mol in self.mols:
-			if float('inf') in mol.Bonds_Between:
+			if float('inf') in mol.Bonds_Between_All():
+			#kan if float('inf') in mol.Bonds_Between():
 				print("disconnected atoms in mol.. discard")
 			elif -1 in mol.bond_type or 0 in mol.bond_type:
 				print("allowed bond type in mol... discard")
@@ -359,7 +380,7 @@ class FragableMSet(MSet):
 		MSet.__init__(self, name_, path_)
 		return
 
-	def ReadGDB9Unpacked(self, path="/Users/johnparkhill/gdb9/"):
+	def ReadGDB9Unpacked(self, path="./datasets/"):
 		""" Reads the GDB9 dataset as a pickled list of molecules"""
 		from os import listdir
 		from os.path import isfile, join

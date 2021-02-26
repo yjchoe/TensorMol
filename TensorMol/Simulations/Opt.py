@@ -57,21 +57,26 @@ class GeomOptimizer:
 		step=0
 		mol_hist = []
 		prev_m = Mol(m.atoms, m.coords)
-		print("Orig Mol:\n", m)
+		# kan print("Orig Mol:\n", m)
 		CG = ConjGradient(self.WrappedEForce, m.coords)
 		while( step < self.max_opt_step and rmsgrad > self.thresh and (rmsdisp > 0.000001 or step<5) ):
 			prev_m = Mol(m.atoms, m.coords)
 			m.coords, energy, frc = CG(m.coords)
 			rmsgrad = np.sum(np.linalg.norm(frc,axis=1))/m.coords.shape[0]
 			rmsdisp = np.sum(np.linalg.norm(m.coords-prev_m.coords,axis=1))/m.coords.shape[0]
-			LOGGER.info(filename+"step: %i energy: %0.5f rmsgrad: %0.5f rmsdisp: %0.5f ", step , energy, rmsgrad, rmsdisp)
+			# kan LOGGER.info(filename+"step: %i energy: %0.5f rmsgrad: %0.5f rmsdisp: %0.5f ", step , energy, rmsgrad, rmsdisp)
+			LOGGER.debug(filename+"step: %i energy: %0.5f rmsgrad: %0.5f rmsdisp: %0.5f ", step , energy, rmsgrad, rmsdisp)
 			mol_hist.append(prev_m)
-			prev_m.properties["Step"] = step
-			prev_m.properties["Energy"] = energy
+			#kanprev_m.properties["Step"] = step
+			#kan prev_m.properties["Energy"] = energy
+			prev_m.properties["step"] = step
+			prev_m.properties["energy"] = energy
 			prev_m.WriteXYZfile("./results/", filename,'a',True)
 			step+=1
 		# Checks stability in each cartesian direction.
-		print("Final Energy:", self.EnergyAndForce(prev_m.coords,False))
+		# kan print("Final Energy:", self.EnergyAndForce(prev_m.coords,False))
+		# kan print the last step
+		LOGGER.info(filename+"step: %i energy: %0.5f rmsgrad: %0.5f rmsdisp: %0.5f ", step , energy, rmsgrad, rmsdisp)
 		return prev_m
 
 	def BumpForce(self,x_):

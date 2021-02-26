@@ -42,7 +42,8 @@ class TFManage:
 		print(self.TData.AvailableDataFiles)
 		print(self.TData.SamplesPerElement)
 		self.name = self.TData.name+"_"+self.TData.dig.name+"_"+self.NetType+"_"+time.strftime("%a_%b_%d_%H.%M.%S_%Y")
-		print("--- TF will be fed by ---", self.TData.name)
+		LOGGER.info("TFManage: --- TF will be fed by --- %s", self.TData.name)
+		print("TFManage:--- TF will be fed by ---", self.TData.name)
 		self.TrainedAtoms=[] # In order of the elements in TData
 		self.TrainedNetworks=[] # In order of the elements in TData
 		self.Instances=[None for i in range(MAX_ATOMIC_NUMBER)] # In order of the elements in TData
@@ -62,10 +63,12 @@ class TFManage:
 		return
 
 	def Save(self):
-		print("Saving TFManager:",self.path+self.name+".tfm")
+		#print("Saving TFManager:",self.path+self.name+".tfm")
+		print("kan TFManage: Saving TFManager:",self.path+self.name+".tfm")
 		self.TData.CleanScratch()
 		f=open(self.path+self.name+".tfm","wb")
-		pickle.dump(self.__dict__, f, protocol=pickle.HIGHEST_PROTOCOL)
+		#kan not py36 pickle.dump(self.__dict__, f, protocol=pickle.HIGHEST_PROTOCOL)
+		pickle.dump(self.__dict__, f)
 		f.close()
 		return
 

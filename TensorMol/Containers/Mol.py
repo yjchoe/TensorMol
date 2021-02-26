@@ -182,6 +182,73 @@ class Mol:
 			if (random.uniform(0, 1)<movechance):
 				self.atoms[i] = random.random_integers(1,PARAMS["MAX_ATOMIC_NUMBER"])
 
+	def read_gaussian_xyz_w_prop(self, path): # kan
+		No_E = True
+		No_F = True
+		No_D = True
+		Energy = 0.0
+		dipole = np.zeros(3)
+		read_input = False
+		read_stand = False
+		#print(path)
+		self.properties["name"] = path[:-4]
+		with open(path,"r") as f:
+        		rlines = f.readlines()
+		for i in range(len(rlines)):
+			if "Input orientation:" in rlines[i]:
+				#print("input start ", i)
+				start = i
+				read_input = True
+		if(not read_input): 
+			for i in range(len(rlines)):
+				if "Standard orientation:" in rlines[i]:
+					#print("standard start ", i)
+					read_stand = True
+					start = i
+		for k in range(start+5,len(rlines)):
+			if "-------" in rlines[k]:
+				end = k
+				break
+		natoms = end - start - 5
+		#print("natoms ", natoms)
+		self.atoms.resize((natoms))
+		self.coords.resize((natoms,3))
+		Forces = np.zeros((self.atoms.shape[0],3))
+		for i in range(len(rlines)):
+			if read_input and "Input orientation:" in rlines[i]:
+				for ia in range(natoms):
+					tmp = rlines[i+5+ia].split()
+					self.atoms[ia,] = int(tmp[1])
+					#self.atoms[ia,] = float(tmp[1])
+					self.coords[ia,:] = float(tmp[3]),float(tmp[4]),float(tmp[5])
+					#print("coords", self.coords[ia,:])
+			if read_stand and "Standard orientation:" in rlines[i]:
+				for ia in range(natoms):
+					tmp = rlines[i+5+ia].split()
+					self.atoms[ia] = int(tmp[1])
+					self.coords[ia,:] = float(tmp[3]),float(tmp[4]),float(tmp[5])
+			if rlines[i].count('SCF Done:')>0:
+				Energy = float(rlines[i].split()[4])
+				self.properties["energy"] = Energy
+				self.CalculateAtomization()
+				No_E = False
+			if "Dipole moment (field-independent basis, Debye):" in rlines[i]:
+				tmp = rlines[i+1].split()
+				dipole = np.asarray([float(tmp[1]),float(tmp[3]),float(tmp[5])])
+				self.properties['dipole'] = dipole
+				No_D = False
+			if "Forces (Hartrees/Bohr)" in rlines[i]:
+				for j in range(natoms):
+					tmp = rlines[i+3+j].split()
+					Forces[j,:] = float(tmp[2]), float(tmp[3]),float(tmp[4])          
+					#print("Force", Forces[j,:])
+					self.properties['gradients'] = -Forces
+					No_F = False
+
+		if(No_E): print("No Energy",Energy)
+		if(No_F): print("No Forces",Forces)
+		if(No_D): print("No dipole",dipole)
+
 	def read_xyz_with_properties(self, path, properties, center=True):
 		try:
 			f=open(path,"r")
@@ -269,6 +336,7 @@ class Mol:
 		"""
 		The format of a property string is
 		Comment: PropertyName1 Array ;PropertyName2 Array;
+                kan: should be: Comment: PropertyName1 Array ;;;PropertyName2 Array;;;
 		The Property names and contents cannot contain ; :
 		"""
 		t = s_.split("Comment:")
@@ -276,10 +344,34 @@ class Mol:
 		tore = {}
 		for prop in t2:
 			s = prop.split()
+			#print("s ", s)
 			if (len(s)<1):
 				continue
+                        # kan add name,grad,dipole
+			elif (s[0]=='name'):
+		                #print("kan found name ",s[0],s[1])
+				tore["name"] = s[1]
+			#elif (s[0]=='gradients'):
+				#print("kan found grad ",s[0],s[1])
+				#grd = s[1].split(",")
+				#natm= len(grd)/3
+				#grds = np.zeros((natm,3))
+				#for i in range(natm):
+					#grds[i,:] = float(grd[i]), float(grd[i+1]),float(grd[i+2])
+				#tore["gradients"] =grds
+			elif (s[0]=='dipole'):
+				#print("kan found dipole ",s[0],s[1])
+				dip = s[1].split(",")
+				dipa = np.asarray([float(dip[0]),float(dip[1]),float(dip[2])])
+				#tore["dipole"] = np.matrix(s[1])
+				tore["dipole"]=np.asarray([float(dip[0]),float(dip[1]),float(dip[2])])
+                        # kan add name,grad,dipole
 			elif (s[0]=='energy'):
+				#print("kan found energy ",s[0],s[1])
 				tore["energy"] = float(s[1])
+				#tore["energy"] = np.fromstring(s[1])
+				#print("energy", float(s[1]))
+				#print("energy", np.fromstring(s[1]))
 			elif (s[0]=='Lattice'):
 				tore["Lattice"] = np.fromstring(s[1]).reshape((3,3))
 		return tore
@@ -288,14 +380,38 @@ class Mol:
 		for prop in self.properties.keys():
 			try:
 				if (prop == "energy"):
+					#tore = tore +prop+" "+str(self.properties["energy"])
 					tore = tore +";;;"+prop+" "+str(self.properties["energy"])
+                                # kan 
+				elif (prop == "gradients"):
+					grd=self.properties[prop]
+					#print ("grd: ", grd)
+					grdl=grd.tolist()
+                                        #grdl_ns =str(grdl).replace(' ','').replace('],',',').replace('[','').replace(']','')+";;;"
+					grdl_ns =str(grdl).replace(' ','').replace('],',',').replace('[','').replace(']','')
+					#print ("grdl_ns: ", grdl_ns)
+					tore = tore +";;;"+prop+" "+grdl_ns
+					#tore = tore +";;;"+prop+" "+str(self.properties[prop])
+				elif (prop == "dipole"):
+					dip=self.properties[prop]
+					dipl = dip.tolist()
+					dipl_ns =str(dipl).replace(' ','').replace(']','').replace('[','')
+					tore = tore +";;;"+prop+" "+dipl_ns
+				elif (prop == "name"):
+				        tore = tore +";;;"+prop+" "+str(self.properties[prop])
+				elif (prop == "atomization"):
+				        tore = tore +";;;"+prop+" "+str(self.properties[prop])
+                                #kan 
 				elif (prop == "Lattice"):
 					tore = tore +";;;"+prop+" "+(self.properties[prop]).tostring()
-				else:
-					tore = tore +";;;"+prop+" "+str(self.properties[prop])
+                                #kan other props are not written
+				else: 
+				    #tore = tore +";;;"+prop+" "+str(self.properties[prop])
+				    tore = tore +prop+" "+str(self.properties[prop])
 			except Exception as Ex:
-				# print "Problem with energy", string
+				print ("PropertyString: Problem with property string ", string)
 				pass
+		#print ("PropertyString: ", tore)
 		return tore
 	def FromXYZString(self,string):
 		lines = string.split("\n")
@@ -305,7 +421,9 @@ class Mol:
 				self.properties = self.ParseProperties(lines[1])
 			except Exception as Ex:
 				print("Problem with energy", Ex)
-				pass
+				print("Problem with energy", Ex)
+				sys.exit() # kan
+				#pass
 		self.atoms.resize((natoms))
 		self.coords.resize((natoms,3))
 		for i in range(natoms):
@@ -333,7 +451,8 @@ class Mol:
 		lines =""
 		natom = self.atoms.shape[0]
 		if (wprop):
-			lines = lines+(str(natom)+"\nComment: "+self.PropertyString()+"\n")
+			#kan lines = lines+(str(natom)+"\nComment: "+self.PropertyString()+"\n")
+			lines = lines+(str(natom)+"\nComment: "+";;;"+self.PropertyString()+";;;"+"\n")
 		else:
 			lines = lines+(str(natom)+"\nComment: \n")
 		for i in range (natom):
@@ -347,7 +466,8 @@ class Mol:
 	def __repr__(self):
 		return self.__str__()
 
-	def WriteXYZfile(self, fpath=".", fname="mol", mode="a", wprop = False):
+	#def WriteXYZfile(self, fpath=".", fname="mol", mode="a", wprop = False): #kan
+	def WriteXYZfile(self, fpath=".", fname="mol", mode="a", wprop = True): #kan
 		if not os.path.exists(os.path.dirname(fpath+"/"+fname+".xyz")):
 			try:
 				os.makedirs(os.path.dirname(fpath+"/"+fname+".xyz"))
@@ -356,6 +476,7 @@ class Mol:
 					raise
 		with open(fpath+"/"+fname+".xyz", mode) as f:
 			for line in self.__str__(wprop).split("\n"):
+                                #print("WriteXYZfile line ",line)
 				f.write(line+"\n")
 
 	def WriteSmiles(self, fpath=".", fname="gdb9_smiles", mode = "a"):
@@ -883,6 +1004,59 @@ class Mol:
 		else:
 			raise Exception("Implement... ")
 		return tore
+	def Bonds_Between_All(self):
+            H_bonds = np.zeros((self.NAtoms(), self.NAtoms()))
+            total_bonds = np.zeros((self.NAtoms(), self.NAtoms()))
+            memory_total=dict()
+            memory_H = dict()
+            for atom_1 in range (0, self.NAtoms()):
+                for atom_2 in range (0, self.NAtoms()):
+                    total_bonds[atom_1][atom_2], H_bonds[atom_1][atom_2] = self.Shortest_Path_DP(atom_1, atom_2, self.NAtoms()-1, memory_total, memory_H)
+            self.Bonds_Between = total_bonds
+            self.H_Bonds_Between = H_bonds
+            return 
+
+	def Bonds_Between(self, atom_1, atom_2, ignore_Hbond = False):  # number of bonds between to atoms, ignore H-? or not.
+            memory_total=dict()
+            memory_H = dict()
+            bonds, H_bonds = self.Shortest_Path_DP(atom_1, atom_2, self.NAtoms()-1, memory_total, memory_H)
+            return  bonds, H_bonds
+
+	def Shortest_Path_DP(self, a, b, k, memory_total, memory_H):
+            index = [a, b]
+            index.sort()
+            index.append(k)
+            index_string = LtoS(index)
+            if index_string in memory_total.keys() and index_string in memory_H.keys():
+                return  memory_total[index_string], memory_H[index_string]
+            elif k == 0 and a!=b:
+                memory_total[index_string] = float('inf')
+                memory_H[index_string] = float('inf')
+                return memory_total[index_string], memory_H[index_string]
+            elif a == b:
+                memory_total[index_string] = 0
+                memory_H[index_string] = 0
+                return  memory_total[index_string],  memory_H[index_string] 
+            else:
+                mini_bond  = float('inf')
+                mini_H_bond = float('inf')
+                save_index = None
+                for node in self.atom_nodes[b].connected_nodes:
+                    index = node.node_index
+                    num_bond, H_bond = self.Shortest_Path_DP(a, index, k-1, memory_total, memory_H)
+                    if num_bond < mini_bond:
+                        mini_bond = num_bond
+                        mini_H_bond = H_bond
+                        save_index = index
+                if save_index !=None:
+                    if self.atom_nodes[b].node_type == 1 or self.atom_nodes[save_index].node_type==1 : 
+                        mini_H_bond += 1
+                mini_bond = mini_bond + 1
+                memory_total[index_string] = mini_bond
+                memory_H [index_string] = mini_H_bond
+                return mini_bond, mini_H_bond 
+# kan add for gdb9
+                
 
 class Frag_of_Mol(Mol):
 	def __init__(self, atoms_=None, coords_=None):

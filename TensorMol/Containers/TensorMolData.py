@@ -38,9 +38,12 @@ class TensorMolData(TensorData):
 		#self.MaxNAtoms = MSet_.MaxNAtoms()
 		TensorData.__init__(self, MSet_,Dig_,Name_, type_=type_)
 		try:
-			LOGGER.info("TensorMolData.type: %s",self.type)
-			LOGGER.info("TensorMolData.dig.name: %s",self.dig.name)
-			LOGGER.info("NMols in TensorMolData.set: %i", len(self.set.mols))
+			#kan LOGGER.info("TensorMolData.type: %s",self.type)
+			#kan LOGGER.info("TensorMolData.dig.name: %s",self.dig.name)
+			#kan LOGGER.info("NMols in TensorMolData.set: %i", len(self.set.mols))
+			LOGGER.debug("TensorMolData.type: %s",self.type)
+			LOGGER.debug("TensorMolData.dig.name: %s",self.dig.name)
+			LOGGER.debug("NMols in TensorMolData.set: %i", len(self.set.mols))
 			self.raw_it = iter(self.set.mols)
 		except:
 			print(" do not include MSet")
@@ -1231,7 +1234,8 @@ class TensorMolData_BP_Direct(TensorMolData):
 			self.eles = list(MSet_.AtomTypes())
 			self.eles.sort()
 			self.MaxNAtoms = np.max([m.NAtoms() for m in self.set.mols])
-			print("self.MaxNAtoms:", self.MaxNAtoms)
+			# kan print("self.MaxNAtoms:", self.MaxNAtoms)
+			LOGGER.debug("self.MaxNAtoms: %i", self.MaxNAtoms)
 			self.Nmols = len(self.set.mols)
 		self.MeanStoich=None
 		self.MeanNAtoms=None
@@ -1240,8 +1244,9 @@ class TensorMolData_BP_Direct(TensorMolData):
 		self.test_mols = []
 		self.MaxN3 = None # The most coordinates in the set.
 		self.name = self.set.name
-		print("TensorMolData_BP.eles", self.eles)
-		print("self.HasGrad:", self.HasGrad)
+		#kan print("TensorMolData_BP.eles", self.eles)
+		LOGGER.debug("TensorMolData_BP.eles: %s ", self.eles)
+		#kan print("self.HasGrad:", self.HasGrad)
 		return
 
 	def CleanScratch(self):

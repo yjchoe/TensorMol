@@ -4,6 +4,9 @@
 
 TODO: The interface to evaluation needs to be completely re-done or done away with.
 Actually I think the better thing is to eliminate any dependence on TFManage whatsoever.
+KAN:
+testing tf.enable_eager_execution
+evaluate_e TFBehlerParinelloSymEE_eager.py
 '''
 from __future__ import absolute_import
 from __future__ import print_function
@@ -13,7 +16,7 @@ from ..Containers.TensorMolData import *
 from .TFMolInstance import *
 from .TFMolInstanceDirect import *
 from .TFBehlerParinello import *
-from .TFBehlerParinelloSymEE import *
+from .TFBehlerParinelloSymEE_eager import *
 from .TFMolInstanceEE import *
 from .TFMolInstanceDirect import *
 from ..Math.QuasiNewtonTools import *
@@ -1369,7 +1372,6 @@ class TFMolManage(TFManage):
 			mol_set=MSet()
 			mol_set.mols.append(mol)
 			self.TData.MaxNAtoms = mol.NAtoms()
-
 		nmols = len(mol_set.mols)
 		dummy_energy = np.zeros((nmols))
 		xyzs = np.zeros((nmols, self.TData.MaxNAtoms, 3), dtype = np.float64)
@@ -1382,10 +1384,20 @@ class TFMolManage(TFManage):
 			natom[i] = mol.NAtoms()
 		NL = NeighborListSet(xyzs, natom, True, True, Zs, sort_=True)
 		rad_p_ele, ang_t_elep, mil_j, mil_jk = NL.buildPairsAndTriplesWithEleIndexLinear(Rr_cut, Ra_cut, self.Instances.eles_np, self.Instances.eles_pairs_np)
-		#print('TFMolManage:EvalBPDirectEandGLinear: xyzs',xyzs)
-		#print('TFMolManage:EvalBPDirectEandGLinear calls evaluate')
-		Etotal, Ebp, Ebp_atom, gradient = self.Instances.evaluate([xyzs, Zs, dummy_energy, dummy_grads, rad_p_ele, ang_t_elep,  mil_j, mil_jk, 1.0/natom])
-		#print('kan EvalBPDirectEandGLinear: Etotal',Etotal)
+                #print('TFMolManage_eager:EvalBPDirectEandGLinear: Rr_cut ',Rr_cut) # kan
+                #print('TFMolManage_eager:EvalBPDirectEandGLinear: Ra_cut ',Ra_cut) # kan
+                #print('TFMolManage_eager:EvalBPDirectEandGLinear: self.Instances.eles_np ',self.Instances.eles_np)
+                #print('TFMolManage_eager:EvalBPDirectEandGLinear: self.Instances.eles_pairs_np',self.Instances.eles_pairs_np) # kan
+                #print('TFMolManage_eager:EvalBPDirectEandGLinear: xyzs',xyzs) # kan
+                #print('TFMolManage_eager:EvalBPDirectEandGLinear: Zs',Zs)
+                #print('rad_p_ele  ',rad_p_ele)
+                #print('ang_t_elep ',ang_t_elep,ang_t_elep.shape)
+                #print('mil_j ', mil_j,mil_j.shape)
+                #print('mil_jk', mil_j,mil_jk.shape)
+		#Etotal, Ebp, Ebp_atom, gradient = self.Instances.evaluate([xyzs, Zs, dummy_energy, dummy_grads, rad_p_ele, ang_t_elep,  mil_j, mil_jk, 1.0/natom])
+		print('TFMolManage_eager:EvalBPDirectEandGLinear gets E and G from evaluate_e')
+		Etotal, Ebp, Ebp_atom, gradient = self.Instances.evaluate_e([xyzs, Zs, dummy_energy, dummy_grads, rad_p_ele, ang_t_elep,  mil_j, mil_jk, 1.0/natom])
+		print('TFMolManage_eager EvalBPDirectEandGLinear: Etotal',Etotal)
 		return Etotal, Ebp, Ebp_atom, -JOULEPERHARTREE*gradient[0]
 	def EvalBPDirectEandGLinearSet(self, mol_set, Rr_cut, Ra_cut):
 		"""

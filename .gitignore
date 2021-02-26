@@ -29,7 +29,8 @@ results
 *.so
 
 # Distribution / packaging
-doc/_build
+doc/_build/
+docs/_build
 .Python
 env/
 build/

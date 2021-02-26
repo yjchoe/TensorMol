@@ -382,9 +382,12 @@ class VelocityVerlet:
 
 	def WriteTrajectory(self):
 		m=Mol(self.atoms,self.x)
-		m.properties["Time"]=self.t
-		m.properties["KineticEnergy"]=self.KE
-		m.properties["PotEnergy"]=self.EPot
+		#kan m.properties["Time"]=self.t
+		#kan m.properties["KineticEnergy"]=self.KE
+		#kan m.properties["PotEnergy"]=self.EPot
+		m.properties["name"]=self.t
+		m.properties["energy"]=self.EPot
+		m.properties["gradients"]=self.f0
 		m.WriteXYZfile("./results/", "MDTrajectory"+self.name)
 		return
 

@@ -68,6 +68,7 @@ try:
 	import MolEmb
 	HAS_EMB = True
 	LOGGER.debug("MolEmb has been found.")
+
 except Exception as Ex:
 	print("MolEmb is not installed. Please cd C_API; sudo python setup.py install",Ex)
 	pass

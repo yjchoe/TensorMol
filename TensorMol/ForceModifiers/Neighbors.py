@@ -19,6 +19,7 @@ from ..Util import *
 import numpy as np
 from MolEmb import *
 import time
+import sys
 
 class NeighborList:
 	"""
@@ -43,6 +44,7 @@ class NeighborList:
 		self.DoTriples = DoTriples_
 		self.DoPerms = DoPerms_
 		self.ele = ele_
+		#print('NeighborList: atomic numbers: Zs, self.ele ', self.ele)
 		self.npairs = None
 		self.ntriples = None
 		self.alg = 0 if self.natom < 2000000 else 1
@@ -50,6 +52,7 @@ class NeighborList:
 		if (alg_ != None):
 			self.alg = alg_
 		self.sort = sort_
+		#print('NeighborList coordinates: self.x', self.x)
 		return
 
 	def Update(self, x_, rcut_pairs=5.0, rcut_triples=5.0, molind_ = None, nreal_ = None):
@@ -116,28 +119,35 @@ class NeighborList:
 
 	def buildPairsAndTriples(self, rcut_pairs=5.0, rcut_triples=5.0, molind_=None, nreal_=None):
 		"""
-		Returns the nonzero pairs, triples in self.x within the cutoff.
+		Returns the nonzero pairs, triples in self.x (a set of xyz) within the cutoff.
 		Triples are non-repeating ie: no 1,2,2 or 2,2,2 etc. but unordered
 
 		Args:
 			rcut: the cutoff for pairs and triples
 		Returns:
-			pair matrix (npair X 2)
+                        pair matrix (npair X 2)
+                        # kan p(m,i,j); m is molecule inex, i,j are atom indices
 			triples matrix (ntrip X 3)
+                        # kan t(m,i,j,k); m is molecular index, i,j,k are atom indices
 		"""
 		if (self.ele is None):
 			print("WARNING... need self.ele for angular SymFunc triples... ")
 		pair = []
 		tpair = [] # since these may have different cutoff
-		ntodo = self.natom
+		ntodo = self.natom # number of atoms in molecule
 		if (nreal_ != None):
 			ntodo = int(nreal_)
 		pair = None
 		tpair = None
 
+		#print ("##buildPairsAndTriples: enter ## ")
+		#print ("buildPairsAndTriples: molind_ ",molind_)
+
 		if (self.alg==0):
 			pair = Make_NListNaive(self.x,rcut_pairs,int(ntodo),int(self.DoPerms))
 			tpair = Make_NListNaive(self.x,rcut_triples,int(ntodo),int(self.DoPerms))
+                        #print ("buildPairsAndTriples: pair: ", pair, "len(pair)", len(pair),"rcut_pairs", rcut_pairs)
+                        #print ("buildPairsAndTriples: tpair: ", tpair,"len(tpair)", len(tpair)) 
 		else:
 			pair = Make_NListLinear(self.x,rcut_pairs,int(ntodo),int(self.DoPerms))
 			tpair = Make_NListLinear(self.x,rcut_triples,int(ntodo),int(self.DoPerms))
@@ -146,7 +156,7 @@ class NeighborList:
 		npairi = map(len,tpair)
 		#ntrip = sum(map(lambda x: x*x if x>0 else 0, npairi))
 		ntrip = sum(map(lambda x: int(x*(x-1)/2) if x>0 else 0, npairi))
-		#print ("npair:", npair, " ntrip:", ntrip, " rcut_triples:", rcut_triples, " tpair", tpair, " ntodo:", int(ntodo), " self.DoPerms", int(self.DoPerms), " x:", self.x[:int(ntodo)], " pair:", pair)
+                #print ("buildPairsAndTriples: npair:", npair, " ntrip:", ntrip, " rcut_triples:", rcut_triples, " tpair", tpair, " ntodo:", int(ntodo), " self.DoPerms", int(self.DoPerms), " x:", self.x[:int(ntodo)], " pair:", pair)
 		p = None
 		t = None
 		if (molind_!=None):
@@ -198,6 +208,10 @@ class NeighborList:
 						tp=tp+1
 		del pair
 		del tpair
+                #print ("buildPairsAndTriples: p: ", p,"t : ", t) 
+                #print ("buildPairsAndTriples: type(p): ", type(p),"t : ", type(t))
+                #print ("buildPairsAndTriples: p.shape: ", p.shape,"t.shape : ",t.shape)
+		#print ("##buildPairsAndTriples: done ## ")
 		return p,t
 
 class NeighborListSet:
@@ -343,28 +357,30 @@ class NeighborListSet:
 
 	def buildPairsAndTriplesWithEleIndex(self, rcut_pairs=5.0, rcut_triples=5.0, ele=None, elep=None):
 		"""
-		generate sorted pairs and triples with index of correspoding ele or elepair append to it.
-		sorted order: mol, i (center atom), l (ele or elepair index), j (connected atom 1), k (connected atom 2 for triples)
+		Generate (for a set molecules, mol) sorted pairs and triples with index of correspoding ele or elepair append to it.
+		sorted order: mol, I (center atom), J (connected atom 1), K (connected atom 2 for triples), L (atom or atom-pair index)
 
 		Args:
 			rcut_: a cutoff parameter.
-			ele: element
-			elep: element pairs
+			ele:  unique elements in a molecule (H2O, [1,8])
+			elep: element pairs (H2O, [1,1], [1,8],[8,8])
 		Returns:
-			(nnzero pairs X 4 pair tensor) (mol, I, J, L)
-			(nnzero triples X 5 triple tensor) (mol, I, J, K, L)
+			trpE_sorted(mol, I, J, L); mol is molecular index, I,J are atom indices in mol
+                        L = ele index (0 or 1 for H2O) 
+			trtE_sorted(mol, I, J, K, L); L = elep index (0, 1 or 2 for H2O)
+                        mil_jk (mol, I, L, valence_pair)
+                        jk_max ??
 		"""
 
 		if not self.sort:
 			print ("Warning! Triples need to be sorted")
 		# if self.ele == None:
 		# 	raise Exception("Element type of each atom is needed.")
-		#import time
 		t0 = time.time()
-		trp, trt = self.buildPairsAndTriples(rcut_pairs, rcut_triples)
 		#print ("trp, trt",trp.shape, trt.shape)
 		#print ("build P and T time:", time.time()-t0)
 		#print ("trp:", trp, "trt:", trt)
+		trp, trt = self.buildPairsAndTriples(rcut_pairs, rcut_triples)
 		t_start = time.time()
 		eleps = np.hstack((elep, np.flip(elep, axis=1))).reshape((elep.shape[0], 2, -1))
 		Z = self.ele[trp[:, 0], trp[:, 2]]
@@ -377,13 +393,24 @@ class NeighborListSet:
 		trip_index = np.where(np.any(np.all(trip_mask, axis=-1),axis=-1))[1]
 		trpE = np.concatenate((trp, pair_index.reshape((-1,1))), axis=-1)
 		trtE = np.concatenate((trt, trip_index.reshape((-1,1))), axis=-1)
+                # after np.concatenate the two arrays above change for int to float! bug?
+                #print ("buildPairsAndTriplesWithEleIndex: trpE, trtE",trpE, trtE) # kan
+                #print('buildPairsAndTriplesWithEleIndex: trpE.shape ',trpE.shape,'trtE.shape',trtE.shape) # kan
+                # change back to int
+		trpE = np.array(trpE,dtype=int)
+		trtE = np.array(trtE,dtype=int)
+		#print ("buildPairsAndTriplesWithEleIndex: trpE\n",trpE )
+		#print ("buildPairsAndTriplesWithEleIndex: trtE\n",trtE)
+                #sys.exit(2)
 		sort_index = np.lexsort((trpE[:,2], trpE[:,3], trpE[:,1], trpE[:,0]))
 		trpE_sorted = trpE[sort_index]
 		sort_index = np.lexsort((trtE[:,2], trtE[:,3], trtE[:,4], trtE[:,1], trtE[:,0]))
+                #print('sort_index ', sort_index)
 		trtE_sorted = trtE[sort_index]
 		#print ("numpy lexsorting time:", time.time() -t0)
 		#print ("time to append and sort element", time.time() - t_start)
-		valance_pair = np.zeros(trt.shape[0])
+		# kan valance_pair = np.zeros(trt.shape[0])
+		valance_pair = np.zeros(trt.shape[0],dtype=int)
 		pointer = 0
 		if (len(trtE_sorted)==0):
 			mil_jk = np.zeros((trt.shape[0],4))
@@ -411,15 +438,21 @@ class NeighborListSet:
 				prev_l = current_l
 				prev_atom = current_atom
 				prev_mol = current_mol
-		#print ("valance_pair:", valance_pair[:20])
+		#print ("valance_pair:", valance_pair)
 		#print ("trtE:", trtE_sorted[:20])
-		mil_jk = np.zeros((trt.shape[0],4))
+		# kan mil_jk = np.zeros((trt.shape[0],4)) # kan change to integers
+		mil_jk = np.zeros((trt.shape[0],4),dtype=int)
+		#print ('mil_jk ', mil_jk)
 		mil_jk[:,[0,1,2]]= trtE_sorted[:,[0,1,4]]
 		mil_jk[:,3] = valance_pair
 		#print ("mil_jk", mil_jk)
 		jk_max = np.max(valance_pair)
 		#print ("after processing time:", time.time() - t_start)
-		#print (trpE_sorted, trtE_sorted, jk_max)
+		#print ('buildPairsAndTriplesWithEleIndex:mil_jk\n', mil_jk)
+		#print ('buildPairsAndTriplesWithEleIndex:jk_max\n ', jk_max)
+                #sys.exit('buildPairsAndTriplesWithEleIndex')
+		#print ("buildPairsAndTriplesWithEleIndex: trpE_sorted\n",trpE_sorted )
+		#print ("buildPairsAndTriplesWithEleIndex: trtE_sorted\n",trtE_sorted)
 		return trpE_sorted, trtE_sorted, mil_jk, jk_max
 
 	@TMTiming("buildPairsAndTriplesWithEleIndexPeriodic")
@@ -433,12 +466,19 @@ class NeighborListSet:
 			ele: element
 			elep: element pairs
 		Returns:
-			(nnzero pairs X 4 pair tensor) (mol, I, J, L)
-			(nnzero triples X 5 triple tensor) (mol, I, J, K, L)
+			trpE_sorted(mol, I, J, L); mol is molecular index, I,J are atom indices in mol
+                        L = ele index (0 or 1 for H2O) 
+			trtE_sorted(mol, I, J, K, L); L = elep index (0, 1 or 2 for H2O)
+                        mil_j (mol, I, L, pair_pair), I, L are the I,J indices of trpE_sorted
+                        mil_jk (mol, I, L, valence_pair) 
 		"""
+		#print('buildPairsAndTriplesWithEleIndexPeriodic: calling buildPairsAndTriplesWithEleIndex')
 		trpE_sorted, trtE_sorted, mil_jk, jk_max = self.buildPairsAndTriplesWithEleIndex(rcut_pairs, rcut_triples, ele, elep)
-		mil_j = np.zeros((trpE_sorted.shape[0], 4))
-		pair_pair = np.zeros(trpE_sorted.shape[0])
+		#print('buildPairsAndTriplesWithEleIndexPeriodic: done')
+		# kan mil_j = np.zeros((trpE_sorted.shape[0], 4))
+		mil_j = np.zeros((trpE_sorted.shape[0], 4),dtype=int) # kan 
+		# kan pair_pair = np.zeros(trpE_sorted.shape[0])
+		pair_pair = np.zeros(trpE_sorted.shape[0],dtype=int) # kan
 		if (len(trpE_sorted)==0):
 			return trpE_sorted, trtE_sorted, mil_j, mil_jk
 		prev_l = trpE_sorted[0][3]

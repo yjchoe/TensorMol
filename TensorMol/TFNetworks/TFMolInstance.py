@@ -34,6 +34,7 @@ class MolInstance(Instance):
 		self.TData.PrintStatus()
 		self.inshape = self.TData.dig.eshape  # use the flatted version
 		self.outshape = self.TData.dig.lshape    # use the flatted version
+		self.chk_start = 0 # kan
 		LOGGER.info("MolInstance.inshape %s MolInstance.outshape %s", str(self.inshape) , str(self.outshape))
 		return
 
@@ -66,10 +67,17 @@ class MolInstance(Instance):
 
 	def train(self, mxsteps, continue_training= False):
 		LOGGER.info("running the TFMolInstance.train()")
+		print("kan running the TFMolInstance.train()")
 		self.TrainPrepare(continue_training)
 		test_freq = PARAMS["test_freq"]
 		mini_test_loss = float('inf') # some big numbers
-		for step in  range (0, mxsteps):
+		#start = self.global_step.eval() # kan get last global_step
+		start = self.chk_start + 1
+		if(start >= mxsteps):
+                        print('Increase max_steps', mxsteps)
+                        return
+		#kan for step in  range (0, mxsteps):
+		for step in  range (start, mxsteps):
 			self.train_step(step)
 			if step%test_freq==0 and step!=0 :
 				test_loss = self.test(step)
@@ -97,25 +105,28 @@ class MolInstance(Instance):
 
 	def save_chk(self, step):  # We need to merge this with the one in TFInstance
 		self.chk_file = os.path.join(self.train_dir,self.name+'-chk-'+str(step))
-		LOGGER.info("Saving Checkpoint file, in the TFMoInstance %s", self.chk_file)
+		LOGGER.info("kan Saving Checkpoint file, in the TFMoInstance save_chk %s", self.chk_file)
 		self.saver.save(self.sess,  self.chk_file)
 		return
 
 	def Load(self):
-		print ("Unpickling TFInstance...")
+		#print ("Unpickling TFInstance...")
+		LOGGER.info("kan Unpickling in TFMolInstance Load %s",self.path+self.name+".tfn") # kan
 		from ..Containers.PickleTM import UnPickleTM as UnPickleTM
 		tmp = UnPickleTM(self.path+self.name+".tfn")
 		self.Clean()
 		self.__dict__.update(tmp)
 		# Simple hack to fix checkpoint path.
 		self.chk_file=self.chk_file.replace("./networks/",PARAMS["networks_directory"])
-		print("self.chk_file:", self.chk_file)
+		#print("self.chk_file:", self.chk_file)
+		print("kan self.chk_file:", self.chk_file)
 		return
 
 	def SaveAndClose(self):
 		if (self.TData!=None):
 			self.TData.CleanScratch()
-		print("Saving TFInstance...")
+		#print("Saving TFInstance...")
+		LOGGER.info("kan Saving TFInstance (tfn) in TFMolInstance SaveAndClose %s",self.path+self.name+".tfn") # kan
 		self.Clean()
 		#print("Going to pickle...\n",[(attr,type(ins)) for attr,ins in self.__dict__.items()])
 		f=open(self.path+self.name+".tfn","wb")
@@ -813,7 +824,6 @@ class MolInstance_fc_sqdiff_BP(MolInstance_fc_sqdiff):
 	def Prepare(self):
 		#eval_labels = np.zeros(Ncase)  # dummy labels
 		print("I am pretty sure this is depreciated and should be removed. ")
-		self.MeanNumAtoms = self.TData.MeanNumAtoms
 		self.batch_size_output = int(1.5*self.batch_size/self.MeanNumAtoms)
 		with tf.Graph().as_default(), tf.device('/job:localhost/replica:0/task:0/gpu:1'):
 			self.inp_pl=[]

@@ -8,12 +8,16 @@ I would still like the following changes:
 - Removal of any dependence on TFInstance.
 
 But at least these are a first step.  JAP 12/2017.
+KAN:
+    testing tf.enable_eager_execution with def evaluate_e
 """
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 # kan
 import sys
+import tensorflow as tf
+tf.enable_eager_execution()
 # kan
 from .TFInstance import *
 from ..Containers.TensorMolData import *
@@ -53,13 +57,13 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 			for j in range(i, len(self.eles)):
 				self.eles_pairs.append([self.eles[i], self.eles[j]])
 		self.eles_pairs_np = np.asarray(self.eles_pairs)
-		print ("kan MolInstance_DirectBP_EandG_SymFunction: self.HasANI1PARAMS ",self.HasANI1PARAMS)
+		print ("MolInstance_DirectBP_EandG_SymFunction: self.HasANI1PARAMS ",self.HasANI1PARAMS)
 		if not self.HasANI1PARAMS:
-			print ("kan MolInstance_DirectBP_EandG_SymFunction: call SetANI1Param ")
+			print ("MolInstance_DirectBP_EandG_SymFunction: call SetANI1Param ")
 			self.SetANI1Param()
 		self.HiddenLayers = PARAMS["HiddenLayers"]
 		self.batch_size = PARAMS["batch_size"]
-		print ("kan MolInstance_DirectBP_EandG_SymFunction:self.HiddenLayers: ", self.HiddenLayers)
+		print ("MolInstance_DirectBP_EandG_SymFunction:self.HiddenLayers: ", self.HiddenLayers)
 		print ("self.activation_function_type: ", self.activation_function_type)
 		if (self.Trainable):
 			self.TData.LoadDataToScratch(self.tformer)
@@ -91,7 +95,6 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 		self.nlayer = len(PARAMS["KeepProb"]) - 1
 		self.monitor_mset =  PARAMS["MonitorSet"]
 		self.chk_start = 0 # kan
-		print ("MolInstance_DirectBP_EandG_SymFunction: Done ")
 
 	def SetANI1Param(self, prec=np.float64):
 		"""
@@ -132,8 +135,8 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 		self.zeta = PARAMS["AN1_zeta"]
 		self.eta = PARAMS["AN1_eta"]
 		self.HasANI1PARAMS = True
-		#print ("self.inshape:", self.inshape)
-        #print("Number of AN1 parameters: self.inshape:", self.inshape)
+		print("MolInstance_DirectBP_EandG_SymFunction:SetANI1Param: self.inshape:", self.inshape)
+		print("Number of AN1 parameters: self.inshape:", self.inshape)
 
 	def Clean(self):
 		"""
@@ -246,7 +249,6 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 			The BP graph energy output
 		"""
 		xyzsInBohr = tf.multiply(xyzs,BOHRPERA)
-		print("MolInstance_DirectBP_EandG_SymFunction:energy_inference: xyzs",xyzs) #kan
 		Ebranches=[]
 		output = tf.zeros([self.batch_size, self.MaxNAtoms], dtype=self.tf_prec)
 		atom_outputs = []
@@ -283,9 +285,9 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 				tf.verify_tensor_all_finite(output,"Nan in output!!!")
 			bp_energy = tf.reshape(tf.reduce_sum(output, axis=1), [self.batch_size])
 		total_energy = tf.identity(bp_energy)
-		#print("kan energy_inference: total_energy",total_energy)
-		#print_op=tf.print("kan energy_inference: total_energy",total_energy)
-		#tf.control_dependencies([print_op])
+		print("kan energy_inference: total_energy",total_energy)
+		print_op=tf.print("kan energy_inference: total_energy",total_energy)
+		tf.control_dependencies([print_op])
 		return total_energy, bp_energy, output
 
 
@@ -487,7 +489,7 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 
 	def evaluate(self, batch_data):
 		"""
-		Evaluate the energy, atom energies, and IfGrad = True the gradients
+		Evaluate the energy, atom energies, and (IfGrad = True the gradients, not implemented, kan)
 		of this Direct Behler-Parinello graph.
 		"""
 		# Check sanity of input
@@ -497,26 +499,98 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 		#print ("self.activation_function:\n\n", self.activation_function)
 		#LOGGER.info("In class MolInstance_DirectBP_EandG_SymFunction evaluate (kan)") #kan
 		#LOGGER.info("TFBehlerParinelloSymEE.py (kan)") #kan
-		#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate:self.batch_size:", self.batch_size, " nmol:", nmol)
-		#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate:batch_data:", batch_data[0]) # coordinates for all molecules in batch
+		# kan print ("self.batch_size:", self.batch_size, " nmol:", nmol)
+		#print ("kan batch_data:", batch_data[0]) # coordinates for all molecules in batch
 		if (batch_data[0].shape[1] != self.MaxNAtoms or self.batch_size != nmol):
 			self.MaxNAtoms = batch_data[0].shape[1]
 			self.batch_size = nmol
-			#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate: self.batch_size:", self.batch_size, "  self.MaxNAtoms:", self.MaxNAtoms)
-			#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate: loading the session..")
-			#print ("MolInstance_DirectBP_EandG_SymFunction: evaluate calls EvalPrepare (kan)")
+			print ("self.batch_size:", self.batch_size, "  self.MaxNAtoms:", self.MaxNAtoms)
+			print ("loading the session..")
+			print ("MolInstance_DirectBP_EandG_SymFunction: evaluate calls EvalPrepare (kan)")
 			self.EvalPrepare()
-		LOGGER.debug("MolInstance_DirectBP_EandG_SymFunction:evaluate:nmol: %i", batch_data[2].shape[0])
+		LOGGER.debug("nmol: %i", batch_data[2].shape[0])
 		self.batch_size = nmol
 		if not self.sess:
-                        print ("MolInstance_DirectBP_EandG_SymFunction:evaulate: self.batch_size:", self.batch_size, "  self.MaxNAtoms:", self.MaxNAtoms)
-                        print ("MolInstance_DirectBP_EandG_SymFunction:evaluate: loading the session..")
-                        self.EvalPrepare()
+			print ("self.batch_size:", self.batch_size, "  self.MaxNAtoms:", self.MaxNAtoms)
+			print ("loading the session..")
+			self.EvalPrepare()
 		feed_dict=self.fill_feed_dict(batch_data+[np.ones(self.nlayer+1)])
 		Etotal, Ebp, Ebp_atom, gradient = self.sess.run([self.Etotal, self.Ebp, self.Ebp_atom, self.gradient], feed_dict=feed_dict)
 		#print ("kan def evaluate gradient: ", gradient[0])
-		print ("kan  MolInstance_DirectBP_EandG_SymFunction:evaluate Etotal", Etotal)
+		print ("MolInstance_DirectBP_EandG_SymFunction:evaluate Etotal", Etotal) # kan
 		return Etotal, Ebp, Ebp_atom, gradient
+
+	def evaluate_e(self, batch_data):
+		"""
+		Evaluate the Behler-Parinello energy, atom energies
+		"""
+		print ("########## TFBehlerParinelloSymEE_eager ###########")
+		print ("##### MolInstance_DirectBP_EandG_SymFunction:evaluate_e: ######")
+		nmol = batch_data[2].shape[0]
+		self.activation_function_type = PARAMS["NeuronType"]
+		self.AssignActivation()
+		#print ("self.activation_function:\n\n", self.activation_function)
+		#print ("self.batch_size:", self.batch_size, " nmol:", nmol)
+		#print ("batch_data:", batch_data[0]) # coordinates for all molecules in batch
+		if (batch_data[0].shape[1] != self.MaxNAtoms or self.batch_size != nmol):
+			self.MaxNAtoms = batch_data[0].shape[1]
+			self.batch_size = nmol
+			print ("self.batch_size:", self.batch_size, "  self.MaxNAtoms:", self.MaxNAtoms)
+		#print ('self.eles_n ', self.eles_np,'self.eles_pairs_np ',self.eles_pairs_np)
+		#print ('self.Rr_cut',self.Rr_cut)
+		#print ('self.SFPa2',self.SFPa2)
+		#print ('self.SFPr2',self.SFPr2)
+		self.batch_size = nmol
+		Ele = tf.Variable(self.eles_np, trainable=False, dtype = tf.int64)
+		Elep = tf.Variable(self.eles_pairs_np, trainable=False, dtype = tf.int64)
+		SFPa2 = tf.Variable(self.SFPa2, trainable= False, dtype = self.tf_prec)
+		SFPr2 = tf.Variable(self.SFPr2, trainable= False, dtype = self.tf_prec)
+		Rr_cut = tf.Variable(self.Rr_cut, trainable=False, dtype = self.tf_prec)
+		#Rr_cut = self.Rr_cut
+		Ra_cut = tf.Variable(self.Ra_cut, trainable=False, dtype = self.tf_prec)
+		#Ra_cut = self.Ra_cut
+		#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.Ra_cut:", self.Ra_cut)
+		zeta = tf.Variable(self.zeta, trainable=False, dtype = self.tf_prec)
+		#zeta = self.zeta
+		#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.zeta:", self.zeta)
+		eta = tf.Variable(self.eta, trainable=False, dtype = self.tf_prec)
+		#eta = self.eta
+		#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.eta:", self.eta)
+		#self.xyzs_pl=batch_data[0] # coordinates for all molecules in batch
+		#print ("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: batch_data[0]", batch_data[0].shape)
+		self.xyzs_pl=tf.Variable(batch_data[0],trainable=False, dtype = self.tf_prec,name="InputCoords")
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.xyzs_pl",self.xyzs_pl) # kan
+		#self.Zs_pl = batch_data[1]
+		self.Zs_pl = tf.Variable(batch_data[1],trainable=False, dtype =tf.int64, name="InputZs")
+		#self.Radp_Ele_pl=batch_data[4]
+		self.Radp_Ele_pl=tf.Variable(batch_data[4],trainable=False,dtype=tf.int64,)
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.Radp_Ele_pl",self.Radp_Ele_pl)
+		#self.Angt_Elep_pl=batch_data[5]
+		self.Angt_Elep_pl=tf.Variable(batch_data[5],trainable=False,dtype=tf.int64)
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.Angt_Elep_pl",self.Angt_Elep_pl)
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.Angt_Elep_pl",self.Angt_Elep_pl.shape)
+		#self.mil_j_pl = batch_data[6]
+		self.mil_j_pl = tf.Variable(batch_data[6],trainable=False,dtype=tf.int64)
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.mil_jk_pl",self.mil_jk_pl)
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.mil_jk_pl",self.mil_jk_pl.shape)
+		#self.mil_jk_pl = batch_data[7]
+		self.mil_jk_pl = tf.Variable(batch_data[7],trainable=False,dtype=tf.int64)
+		self.natom_pl = tf.Variable(self.batch_size,trainable=False,dtype=self.tf_prec)
+		#self.keep_prob_pl = PARAMS["KeepProb"]
+		self.keep_prob_pl = tf.Variable(PARAMS["KeepProb"],trainable=False,dtype=self.tf_prec)
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e: self.keep_prob_pl",self.keep_prob_pl)
+		#print("MolInstance_DirectBP_EandG_SymFunction:evaluate_e calls TFSymSet_Scattered_Linear_WithEle_Release")
+		self.Scatter_Sym, self.Sym_Index  = TFSymSet_Scattered_Linear_WithEle_Release(self.xyzs_pl, self.Zs_pl, Ele, SFPr2, Rr_cut, Elep, SFPa2, zeta, eta, Ra_cut, self.Radp_Ele_pl, self.Angt_Elep_pl, self.mil_j_pl, self.mil_jk_pl)
+		#sys.exit(2)
+		self.Etotal, self.Ebp, self.Ebp_atom = self.energy_inference(self.Scatter_Sym, self.Sym_Index, self.xyzs_pl, self.keep_prob_pl)
+		print("evaluate_e: self.Etotal",self.Etotal)
+		#self.gradient  = tf.gradients(self.Etotal, self.xyzs_pl, name="BPEGrad")
+		dummy_grads = np.zeros((nmol, self.MaxNAtoms, 3), dtype = np.float64)
+		self.gradient  = dummy_grads # need to work on gradient tf.GradientTape instead
+		#self.saver = tf.train.Saver(max_to_keep = self.max_checkpoints)
+		print ("kan  MolInstance_DirectBP_EandG_SymFunction:evaluate_e self.Etotal", self.Etotal)
+		#sys.exit(2)
+		return self.Etotal, self.Ebp, self.Ebp_atom, self.gradient
 
 	def EvalPrepare(self,  continue_training =False):
 		"""
@@ -544,11 +618,8 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 			Ra_cut = tf.Variable(self.Ra_cut, trainable=False, dtype = self.tf_prec)
 			zeta = tf.Variable(self.zeta, trainable=False, dtype = self.tf_prec)
 			eta = tf.Variable(self.eta, trainable=False, dtype = self.tf_prec)
-			print("EvalPrepare calls TFSymSet_Scattered_Linear_WithEle_Release")
 			self.Scatter_Sym, self.Sym_Index  = TFSymSet_Scattered_Linear_WithEle_Release(self.xyzs_pl, self.Zs_pl, Ele, SFPr2, Rr_cut, Elep, SFPa2, zeta, eta, Ra_cut, self.Radp_Ele_pl, self.Angt_Elep_pl, self.mil_j_pl, self.mil_jk_pl)
-			print("EvalPrepare calls energy_inference")
 			self.Etotal, self.Ebp, self.Ebp_atom = self.energy_inference(self.Scatter_Sym, self.Sym_Index, self.xyzs_pl, self.keep_prob_pl)
-			print("EvalPrepare:self.Etotal",self.Etotal)
 			self.gradient  = tf.gradients(self.Etotal, self.xyzs_pl, name="BPEGrad")
 			self.sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
 			self.saver = tf.train.Saver(max_to_keep = self.max_checkpoints)
@@ -2307,8 +2378,8 @@ class MolInstance_DirectBP_Charge_SymFunction(MolInstance_fc_sqdiff_BP):
 		LOGGER.debug("nmol: %i", batch_data[2].shape[0])
 		self.batch_size = nmol
 		if not self.sess:
-			print ("kan self.batch_size:", self.batch_size, "  self.MaxNAtoms:", self.MaxNAtoms)
-			print ("kan loading the session..")
+			print ("self.batch_size:", self.batch_size, "  self.MaxNAtoms:", self.MaxNAtoms)
+			print ("loading the session..")
 			self.EvalPrepare()
 		feed_dict=self.fill_feed_dict(batch_data+[np.ones(self.nlayer+1)])
 		mol_dipole, atom_charge, eleneg = self.sess.run([self.dipole, self.charge, self.eleneg], feed_dict=feed_dict)
