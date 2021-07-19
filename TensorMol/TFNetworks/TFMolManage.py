@@ -25,7 +25,8 @@ import sys
 if sys.version_info[0] < 3:
 	import cPickle as pickle
 else:
-	import _pickle as pickle
+	#kan import _pickle as pickle
+	import pickle as pickle
 
 
 mol_set=MSet()

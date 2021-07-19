@@ -16,8 +16,13 @@ from ..ForceModels.ElectrostaticsTF import * # Why is this imported here?
 from tensorflow.python.client import timeline
 import numpy as np
 from tensorflow.python.framework import function
+import sys
 if (HAS_TF):
-	import tensorflow as tf
+	if sys.version_info[0] < 3:
+		import tensorflow as tf
+	else:
+		import tensorflow.compat.v1 as tf # use tf2 with py3
+		tf.disable_v2_behavior()
 
 def tf_pairs_list(xyzs, Zs, r_cutoff, element_pairs):
 	dxyzs = tf.expand_dims(xyzs, axis=2) - tf.expand_dims(xyzs, axis=1)

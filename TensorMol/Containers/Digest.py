@@ -7,7 +7,8 @@ import numpy as np
 if sys.version_info[0] < 3:
 	import cPickle as pickle
 else:
-	import _pickle as pickle
+	#kan import _pickle as pickle
+	import pickle as pickle
 from ..Math import LinearOperations
 if (HAS_EMB):
 	import MolEmb

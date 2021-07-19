@@ -3,6 +3,7 @@ Routines for running external Ab-Initio packages to get shit out of mol.py
 """
 from __future__ import absolute_import
 from __future__ import print_function
+from os.path import isfile
 import numpy as np
 import random, math, subprocess
 # kan from pyscf import gto, scf, dft
@@ -37,24 +38,25 @@ def PyscfDft(m_,basis_ = '6-31g*',xc_='b3lyp'):
 	dip=mf.dip_moment(verbose=0)
 	return e,grd*JOULEPERHARTREE*BOHRPERA # for md 
 	#return e,grd*JOULEPERHARTREE*BOHRPERA,dip
-def G09DFT(m_,basis_ = '6-31g*',xc_='b3lyp', jobtype_='force', filename_='tmp', path_='./g09/', joule_per_a=True,mem=False,nproc=4,nprocl=False):
+def G09DFT(m_,basis_ = '6-31g*',xc_='b3lyp', jobtype_='force', filename_='tmp', path_='./g09/', joule_per_a=False,mem=False,nproc=40,nprocl=False,inp_only=True):
 	#istring = '%chk='+filename_+'.chk\n'
 	istring = ''
 	if mem:
 	    istring = istring+'%mem='+str(mem)+'\n'
 	else:
-	    istring = istring+'%mem=1500Mb\n'
+	    istring = istring+'%mem=3500Mb\n'
 	if nprocl:
 	    istring = istring+'%nprocl='+str(nprocl)+'\n'
 	if nproc:
 	    istring = istring+'%nproc='+str(nproc)+'\n'
 	else:
-	    istring = istring+'%nproc=4\n'
+	    istring = istring+'%nproc=nproc\n'
 	if jobtype_ == 'sp':
 	    #istring = istring+'#p '+xc_+','+basis_+',scf=(tight,direct),pop=Hirshfeld\n'
 	    istring = istring+'#p '+xc_+','+basis_+',int=(Grid=Ultrafine),scf=(tight,direct)\n'
 	else:
-	    istring = istring+'#p '+xc_+','+basis_+','+jobtype_+',int=(Grid=Ultrafine),scf=(tight,direct)\n'
+	    #istring = istring+'#p '+xc_+','+basis_+','+jobtype_+',int=(Grid=Ultrafine),scf=(tight,direct)\n'
+	    istring = istring+'#p '+xc_+','+basis_+','+jobtype_+',int=(Grid=FineGrid),scf=(tight,direct)\n'
 	istring = istring+'\n#c\n' # comment card
 	istring = istring+'\n0 1 \n' # charge and mult
 	crds = m_.coords.copy()
@@ -62,8 +64,13 @@ def G09DFT(m_,basis_ = '6-31g*',xc_='b3lyp', jobtype_='force', filename_='tmp', 
 	for j in range(len(m_.atoms)):
 		istring=istring+str(m_.atoms[j])+' '+str(crds[j,0])+' '+str(crds[j,1])+' '+str(crds[j,2])+'\n'
 	istring=istring+'\n'
+	if isfile(path_+'gbs'): istring=istring+'@gbs/N'+'\n'
+	istring=istring+'\n'
 	with open(path_+filename_+'.com','w') as fin:
 		fin.write(istring)
+		if(inp_only): 
+			print(path_+filename_+'.com','written')
+			return 0.0, 0.0, 0.0
 	if nprocl:
 	   proc = subprocess.Popen(['g09l_e01', path_+filename_], stdout=subprocess.PIPE, stderr=subprocess.PIPE,shell=False)
 	else:

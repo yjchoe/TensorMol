@@ -6,7 +6,8 @@ import gc, random, os, sys, re, atexit
 if sys.version_info[0] < 3:
 	import cPickle as pickle
 else:
-	import _pickle as pickle
+	#kan import _pickle as pickle
+	import pickle as pickle
 import random, math, time, itertools, warnings
 from math import pi as Pi
 import scipy.special
@@ -73,13 +74,13 @@ except Exception as Ex:
 	print("MolEmb is not installed. Please cd C_API; sudo python setup.py install",Ex)
 	pass
 
-try:
-	import tensorflow as tf
-	LOGGER.debug("Tensorflow version "+tf.__version__+" has been found")
-	HAS_TF = True
-except:
-	LOGGER.info("Tensorflow not Installed, very limited functionality")
-	pass
+#kan try:
+	#import tensorflow as tf
+	#LOGGER.debug("Tensorflow version "+tf.__version__+" has been found")
+	#HAS_TF = True
+#except:
+	#LOGGER.info("Tensorflow not Installed, very limited functionality")
+	#pass
 
 try:
 	import multiprocessing

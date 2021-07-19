@@ -3,7 +3,23 @@ from __future__ import print_function
 import logging, time, os, sys
 from math import pi as Pi
 import numpy as np
-import tensorflow as tf
+TF2_MODE = False
+try:
+	if sys.version_info[0] < 3:
+		import tensorflow as tf
+		print("Using Tensorflow version "+tf.__version__)
+	else:
+		if(TF2_MODE):
+			import tensorflow as tf
+			print("Using Tensorflow version "+tf.__version__)
+		else:
+			import tensorflow.compat.v1 as tf # use tf2 with py3
+			tf.disable_v2_behavior()
+			print("Using Tensorflow version "+tf.__version__+" with compat.v1 ")
+	HAS_TF = True
+except:
+	print("Tensorflow not Installed, very limited functionality")
+	pass
 
 class TMParams(dict):
 	def __init__(self, *args, **kwargs ):
@@ -194,10 +210,16 @@ def TMLogger(path_):
 	# Check path and make if it doesn't exist...
 	if not os.path.exists(path_):
 		os.makedirs(path_)
+	# kan add py source to path_
+	py_source= ""
+	ADD_PY_SOURCE = False
+	if(ADD_PY_SOURCE): 
+		py_source=str(sys.argv[0])
+		if(py_source[-2:] == 'py'): py_source = py_source[:-3]+'_'
+		path_ = path_+py_source
 	fh = logging.FileHandler(filename=path_+time.strftime("%a_%b_%d_%H.%M.%S_%Y")+'.log')
 	fh.setLevel(logging.DEBUG)
-	#kan ch = logging.StreamHandler(sys.stdout) # change logging.INFO to file below
-	ch = logging.FileHandler(filename=path_+time.strftime("%a_%b_%d_%H.%M.%S_%Y")+'.log')
+	ch = logging.StreamHandler(sys.stdout) # change logging.INFO to  stdout
 	ch.setLevel(logging.INFO)
 	fformatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 	pformatter = logging.Formatter('%(message)s')

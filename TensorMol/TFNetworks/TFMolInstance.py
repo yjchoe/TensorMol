@@ -8,14 +8,18 @@ import numpy as np
 import math
 import time
 import os.path
-if (HAS_TF):
-	import tensorflow as tf
 import os
 import sys
 if sys.version_info[0] < 3:
 	import cPickle as pickle
+	if (HAS_TF):
+		import tensorflow as tf
 else:
-	import _pickle as pickle
+	#import _pickle as pickle
+	import pickle as pickle
+	if (HAS_TF):
+		import tensorflow.compat.v1 as tf # for tf2 with py3
+		tf.disable_v2_behavior()
 
 #
 # These work Moleculewise the versions without the mol prefix work atomwise.

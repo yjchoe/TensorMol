@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 from ..Util import *
+from ..PhysicalData import *
 from ..Math import *
 import MolEmb
 
@@ -242,7 +243,7 @@ class Mol:
 					tmp = rlines[i+3+j].split()
 					Forces[j,:] = float(tmp[2]), float(tmp[3]),float(tmp[4])          
 					#print("Force", Forces[j,:])
-					self.properties['gradients'] = -Forces
+					self.properties['gradients'] = -Forces*BOHRPERA
 					No_F = False
 
 		if(No_E): print("No Energy",Energy)

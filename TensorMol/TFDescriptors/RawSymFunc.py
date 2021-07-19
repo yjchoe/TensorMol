@@ -17,8 +17,13 @@ from tensorflow.python.client import timeline
 import numpy as np
 import time
 from tensorflow.python.framework import function
+import sys
 if (HAS_TF):
-	import tensorflow as tf
+	if sys.version_info[0] < 3:
+		import tensorflow as tf
+	else:
+		import tensorflow.compat.v1 as tf # use tf2 with py3
+		tf.disable_v2_behavior()
 
 def AllTriples(rng):
 	"""Returns all possible triples of an input list.
