@@ -1552,8 +1552,10 @@ class TensorMolData_BP_Direct_Linear(TensorMolData_BP_Direct):
 	"""
 	This tensordata serves up batches digested within TensorMol.
 	"""
-	def __init__(self, MSet_=None,  Dig_=None, Name_=None, order_=3, num_indis_=1, type_="mol", WithGrad_ = False):
+	def __init__(self, MSet_=None,  Dig_=None, Name_=None, order_=3, num_indis_=1, type_="mol", WithGrad_ = False,
+				 randomize_data=False):
 		TensorMolData_BP_Direct.__init__(self, MSet_, Dig_, Name_, order_, num_indis_, type_, WithGrad_)
+		self.randomize_data = randomize_data
 		self.Rr_cut = PARAMS["AN1_r_Rc"]
 		self.Ra_cut = PARAMS["AN1_a_Rc"]
 		return
@@ -1564,7 +1566,8 @@ class TensorMolData_BP_Direct_Linear(TensorMolData_BP_Direct):
 				self.ReloadSet()
 			except Exception as Ex:
 				print("TData doesn't have a set.", Ex)
-		random.shuffle(self.set.mols)
+		if self.randomize_data:
+			random.shuffle(self.set.mols)
 		xyzs = np.zeros((self.Nmols, self.MaxNAtoms, 3), dtype = np.float64)
 		Zs = np.zeros((self.Nmols, self.MaxNAtoms), dtype = np.int32)
 		natom = np.zeros((self.Nmols), dtype = np.int64)
@@ -1589,7 +1592,7 @@ class TensorMolData_BP_Direct_Linear(TensorMolData_BP_Direct):
 		else:
 			return xyzs, Zs, labels, natom
 
-	def LoadDataToScratch(self, tformer):
+	def LoadDataToScratch(self, tformer=None):
 		"""
 		Reads built training data off disk into scratch space.
 		Divides training and test data.
@@ -1804,13 +1807,15 @@ class TensorMolData_BP_Direct_EandG_Release(TensorMolData_BP_Direct_Linear):
 	"""
 	This tensordata serves up batches digested within TensorMol.
 	"""
-	def __init__(self, MSet_=None,  Dig_=None, Name_=None, order_=3, num_indis_=1, type_="mol", WithGrad_ = True):
-		TensorMolData_BP_Direct_Linear.__init__(self, MSet_, Dig_, Name_, order_, num_indis_, type_, WithGrad_)
+	def __init__(self, MSet_=None,  Dig_=None, Name_=None, order_=3, num_indis_=1, type_="mol", WithGrad_ = True,
+				 randomize_data=False):
+		TensorMolData_BP_Direct_Linear.__init__(self, MSet_, Dig_, Name_, order_, num_indis_, type_, WithGrad_,
+												randomize_data)
 		self.ele = None #  determine later
 		self.elep = None # determine later
 		return
 
-	def GetTrainBatch(self, ncases):
+	def GetTrainBatch(self, ncases, compute_neighbors=True):
 		if (self.ScratchState == 0):
 			self.LoadDataToScratch()
 		reset = False
@@ -1823,14 +1828,19 @@ class TensorMolData_BP_Direct_EandG_Release(TensorMolData_BP_Direct_Linear):
 		Zs = self.Zs[self.ScratchPointer-ncases:self.ScratchPointer]
 		Elabels = self.labels[self.ScratchPointer-ncases:self.ScratchPointer]
 		natom = self.natom[self.ScratchPointer-ncases:self.ScratchPointer]
-		NL = NeighborListSet(xyzs, natom, True, True, Zs, sort_=True)
-		rad_p_ele, ang_t_elep, mil_j, mil_jk = NL.buildPairsAndTriplesWithEleIndexLinear(self.Rr_cut, self.Ra_cut, self.ele, self.elep)
+		if compute_neighbors:
+			NL = NeighborListSet(xyzs, natom, True, True, Zs, sort_=True)
+			rad_p_ele, ang_t_elep, mil_j, mil_jk = NL.buildPairsAndTriplesWithEleIndexLinear(
+				self.Rr_cut, self.Ra_cut, self.ele, self.elep)
+		else:
+			rad_p_ele, ang_t_elep, mil_j, mil_jk = None, None, None, None
 		if (self.HasGrad):
-			return [xyzs, Zs, Elabels, self.grads[self.ScratchPointer-ncases:self.ScratchPointer], rad_p_ele, ang_t_elep, mil_j, mil_jk, 1.0/natom]
+			return [xyzs, Zs, Elabels, self.grads[self.ScratchPointer-ncases:self.ScratchPointer],
+					rad_p_ele, ang_t_elep, mil_j, mil_jk, 1.0/natom]
 		else:
 			return [xyzs, Zs, Elabels, rad_p_ele, ang_t_elep, mil_j, mil_jk, 1.0/natom]
 
-	def GetTestBatch(self,ncases):
+	def GetTestBatch(self, ncases, compute_neighbors=True):
 		if (self.ScratchState == 0):
 			self.LoadDataToScratch()
 		reset = False
@@ -1843,10 +1853,15 @@ class TensorMolData_BP_Direct_EandG_Release(TensorMolData_BP_Direct_Linear):
 		Zs = self.Zs[self.test_ScratchPointer-ncases:self.test_ScratchPointer]
 		Elabels = self.labels[self.test_ScratchPointer-ncases:self.test_ScratchPointer]
 		natom = self.natom[self.test_ScratchPointer-ncases:self.test_ScratchPointer]
-		NL = NeighborListSet(xyzs, natom, True, True, Zs, sort_=True)
-		rad_p_ele, ang_t_elep, mil_j, mil_jk = NL.buildPairsAndTriplesWithEleIndexLinear(self.Rr_cut, self.Ra_cut, self.ele, self.elep)
+		if compute_neighbors:
+			NL = NeighborListSet(xyzs, natom, True, True, Zs, sort_=True)
+			rad_p_ele, ang_t_elep, mil_j, mil_jk = NL.buildPairsAndTriplesWithEleIndexLinear(
+				self.Rr_cut, self.Ra_cut, self.ele, self.elep)
+		else:
+			rad_p_ele, ang_t_elep, mil_j, mil_jk = None, None, None, None
 		if (self.HasGrad):
-			return [xyzs, Zs, Elabels, self.grads[self.test_ScratchPointer-ncases:self.test_ScratchPointer], rad_p_ele, ang_t_elep, mil_j, mil_jk, 1.0/natom]
+			return [xyzs, Zs, Elabels, self.grads[self.test_ScratchPointer-ncases:self.test_ScratchPointer],
+					rad_p_ele, ang_t_elep, mil_j, mil_jk, 1.0/natom]
 		else:
 			return [xyzs, Zs, Elabels, rad_p_ele, ang_t_elep, mil_j, mil_jk, 1.0/natom]
 
