@@ -38,13 +38,15 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
     without sessions, (explicitly defined) graphs or placeholders.**
     """
 
-    def __init__(self, TData_, Name_=None, Trainable_=True, ForceType_="LJ"):
+    def __init__(self, TData_, Name_=None, Trainable_=True, ForceType_="LJ",
+                 share_weights=False):
         """
         Args:
             TData_: A TensorMolData instance.
             Name_: A name for this instance.
             Trainable_: True for training, False for evalution
             ForceType_: Deprecated
+            share_weights: Whether to share weights between input elements
         """
         self.SFPa = None
         self.SFPr = None
@@ -67,9 +69,11 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
             self.SetANI1Param()
         self.HiddenLayers = PARAMS["HiddenLayers"]
         self.batch_size = PARAMS["batch_size"]
+        self.share_weights = share_weights
         LOGGER.info("HiddenLayers: %s", self.HiddenLayers)
         LOGGER.info("activation_function_type: %s",
                     self.activation_function_type)
+        LOGGER.info("share_weights: %s", self.share_weights)
         if (self.Trainable):
             self.TData.LoadDataToScratch(self.tformer)
         self.summary_writer = None
@@ -364,20 +368,44 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
         batch_size = tf.shape(xyzs)[0]
         outputs = tf.zeros((batch_size, self.MaxNAtoms), dtype=self.tf_prec)
 
+        if self.share_weights:
+            hidden_layers = [
+                _make_layer(n_in, n_out,
+                            l2_wd=self.weight_decay, name=f"hidden{j}")
+                for j, (n_in, n_out) in enumerate(
+                    zip(layer_sizes[:-1], layer_sizes[1:]))
+            ]
+            output_layer = _make_layer(layer_sizes[-1], 1,
+                                       l2_wd=0.0,
+                                       name="regression_linear")
+        else:
+            hidden_layers = []
+            output_layer = None
+
         # MLP for each element
         for i, elem in enumerate(self.eles):
             h = inp[i]
-            for j, (n_in, n_out, keep_p) in enumerate(
-                    zip(layer_sizes[:-1], layer_sizes[1:], keep_prob)):
-                layer = _make_layer(n_in, n_out,
-                                    l2_wd=self.weight_decay,
-                                    name=f"elem{elem:02d}_hidden{j}")
-                h = layer(h)
-                if keep_p < 1.0:
-                    h = tf.keras.layers.Dropout(1. - keep_p)(h)
-            output_layer = _make_layer(layer_sizes[-1], 1,
-                                       l2_wd=0.0,
-                                       name=f"elem{elem:02d}_regression_linear")
+            if self.share_weights:
+                for hidden_layer, keep_p in zip(hidden_layers, keep_prob):
+                    h = hidden_layer(h)
+                    if keep_p < 1.0:
+                        h = tf.keras.layers.Dropout(1. - keep_p)(h)
+            else:
+                for j, (n_in, n_out, keep_p) in enumerate(
+                        zip(layer_sizes[:-1], layer_sizes[1:], keep_prob)):
+                    hidden_layer = _make_layer(
+                        n_in, n_out,
+                        l2_wd=self.weight_decay,
+                        name=f"elem{elem:02d}_hidden{j}",
+                    )
+                    h = hidden_layer(h)
+                    if keep_p < 1.0:
+                        h = tf.keras.layers.Dropout(1. - keep_p)(h)
+                output_layer = _make_layer(
+                    layer_sizes[-1], 1,
+                    l2_wd=0.0,
+                    name=f"elem{elem:02d}_regression_linear",
+                )
             out = output_layer(h)  # (flattened_batch, 1)
             natoms_batch = tf.shape(out)[0]  # scalar tensor
 
