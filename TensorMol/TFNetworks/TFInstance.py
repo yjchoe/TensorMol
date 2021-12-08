@@ -62,6 +62,7 @@ class Instance:
 		except:
 			self.tf_prec = eval(PARAMS["tf_prec"])
 		self.HiddenLayers = PARAMS["HiddenLayers"]
+		self.ShareWeights = PARAMS["ShareWeights"]
 		self.hidden1 = PARAMS["hidden1"]
 		self.hidden2 = PARAMS["hidden2"]
 		self.hidden3 = PARAMS["hidden3"]

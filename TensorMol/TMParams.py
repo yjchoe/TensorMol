@@ -75,11 +75,14 @@ class TMParams(dict):
 		self["learning_rate"] = 0.001
 		self["learning_rate_dipole"] = 0.0001
 		self["learning_rate_energy"] = 0.00001
+		self["decay_steps"] = 10000
+		self["decay_rate"] = 0.9
 		self["momentum"] = 0.9
 		self["max_steps"] = 1001
 		self["batch_size"] = 1000
 		self["test_freq"] = 10
 		self["HiddenLayers"] = [200, 200, 200]
+		self["ShareWeights"] = False
 		self["hidden1"] = 512
 		self["hidden2"] = 512
 		self["hidden3"] = 512

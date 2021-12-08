@@ -38,15 +38,13 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
     without sessions, (explicitly defined) graphs or placeholders.**
     """
 
-    def __init__(self, TData_, Name_=None, Trainable_=True, ForceType_="LJ",
-                 share_weights=False):
+    def __init__(self, TData_, Name_=None, Trainable_=True, ForceType_="LJ"):
         """
         Args:
             TData_: A TensorMolData instance.
             Name_: A name for this instance.
             Trainable_: True for training, False for evalution
             ForceType_: Deprecated
-            share_weights: Whether to share weights between input elements
         """
         self.SFPa = None
         self.SFPr = None
@@ -68,17 +66,21 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
             LOGGER.info("calling SetANI1Param")
             self.SetANI1Param()
         self.HiddenLayers = PARAMS["HiddenLayers"]
+        self.ShareWeights = PARAMS["ShareWeights"]
         self.batch_size = PARAMS["batch_size"]
-        self.share_weights = share_weights
         LOGGER.info("HiddenLayers: %s", self.HiddenLayers)
         LOGGER.info("activation_function_type: %s",
                     self.activation_function_type)
-        LOGGER.info("share_weights: %s", self.share_weights)
+        LOGGER.info("ShareWeights: %s", self.ShareWeights)
         if (self.Trainable):
             self.TData.LoadDataToScratch(self.tformer)
         self.summary_writer = None
+
         self.learning_rate = PARAMS["learning_rate"]
-        self.weight_decay = PARAMS.get("weight_decay", 0.001)
+        self.decay_steps = PARAMS["decay_steps"]
+        self.decay_rate = PARAMS["decay_rate"]
+        self.momentum = PARAMS["momentum"]
+        self.weight_decay = PARAMS["weight_decay"]
         self.suffix = PARAMS["NetNameSuffix"]
         self.SetANI1Param()
 
@@ -246,16 +248,16 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
         self.training = True
         return self.Prepare(continue_training=continue_training)
 
-    def EvalPrepare(self, instance_name=None):
+    def EvalPrepare(self, instance_name=None, ckpt_no=0):
         """Setup tf.keras.Model for evaluation.
 
         A trained model is retrieved from
             `os.path.join(PARAMS["networks_directory"], instance_name)`.
         """
         self.training = False
-        return self.Prepare(instance_name=instance_name)
+        return self.Prepare(instance_name=instance_name, ckpt_no=ckpt_no)
 
-    def Prepare(self, continue_training=False, instance_name=None):
+    def Prepare(self, continue_training=False, instance_name=None, ckpt_no=0):
         """
         Setup tf.keras.Model for training or evaluation.
 
@@ -308,9 +310,16 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
 
         # tf.keras.Optimizer
         if self.training:
-            self.optim = tf.keras.optimizers.Adam(
-                learning_rate=self.learning_rate)
-            LOGGER.info(f"using Adam optimizer with lr {self.learning_rate}")
+            lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+                initial_learning_rate=self.learning_rate,
+                decay_steps=self.decay_steps,
+                decay_rate=self.decay_rate,
+                staircase=True,
+            )
+            self.optim = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+            LOGGER.info("using Adam optimizer (initial lr %g) "
+                        "with exponential decay (by %g every %d steps)",
+                        self.learning_rate, self.decay_rate, self.decay_steps)
 
         # tf.train.Checkpoint (simplified)
         if instance_name is not None:
@@ -319,10 +328,18 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
         else:
             ckpt_dir = self.train_dir
         if not self.training or continue_training:
-            ckpt = tf.train.latest_checkpoint(ckpt_dir)
+            if ckpt_no:
+                ckpt = os.path.join(ckpt_dir, f"cp-{ckpt_no:04d}.ckpt")
+                assert os.path.exists(ckpt + ".index"), (
+                    f"requested checkpoint with number {ckpt_no} does not exist"
+                )
+            else:
+                ckpt = tf.train.latest_checkpoint(ckpt_dir)
             if ckpt is not None:
-                LOGGER.info(f"restoring latest checkpoint from %s", ckpt)
+                LOGGER.info("restoring latest checkpoint from %s", ckpt)
                 self.model.load_weights(ckpt)
+                self.chk_start = int(os.path.splitext(ckpt)[0].split("-")[-1])
+                LOGGER.info("# epochs trained: %d", self.chk_start)
             elif self.training:
                 LOGGER.info(
                     f"no saved checkpoint found in %s, training from scratch",
@@ -368,7 +385,7 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
         batch_size = tf.shape(xyzs)[0]
         outputs = tf.zeros((batch_size, self.MaxNAtoms), dtype=self.tf_prec)
 
-        if self.share_weights:
+        if self.ShareWeights:
             hidden_layers = [
                 _make_layer(n_in, n_out,
                             l2_wd=self.weight_decay, name=f"hidden{j}")
@@ -385,7 +402,7 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
         # MLP for each element
         for i, elem in enumerate(self.eles):
             h = inp[i]
-            if self.share_weights:
+            if self.ShareWeights:
                 for hidden_layer, keep_p in zip(hidden_layers, keep_prob):
                     h = hidden_layer(h)
                     if keep_p < 1.0:
@@ -469,9 +486,13 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
         total_loss = 0.0
         total_energy_loss = 0.0
         total_grads_loss = 0.0
+        pbar_metrics = ["loss", "energy_loss", "grads_loss"]
+        if training:
+            pbar_metrics.append("lr")
         pbar = tf.keras.utils.Progbar(
             int(n_cases / self.batch_size) * self.batch_size,
-            stateful_metrics=["loss", "energy_loss", "grads_loss"])
+            stateful_metrics=pbar_metrics,
+        )
 
         if training and not profiling:
             LOGGER.info(f"[Epoch {epoch}]")
@@ -514,11 +535,12 @@ class MolInstance_DirectBP_EandG_SymFunction(MolInstance_fc_sqdiff_BP):
                 "energy_loss": energy_loss.numpy().item(),
                 "grads_loss": grads_loss.numpy().item(),
             }
-            pbar.add(
-                self.batch_size,
-                values=[(name, l / self.batch_size)
-                        for name, l in losses.items()],
-            )
+            pbar_values = [(name, l / self.batch_size)
+                           for name, l in losses.items()]
+            if training:
+                pbar_values += [("lr",
+                                 self.optim.lr(self.optim.iterations).numpy())]
+            pbar.add(self.batch_size, values=pbar_values)
             total_loss += losses["loss"]
             total_energy_loss += losses["energy_loss"]
             total_grads_loss += losses["grads_loss"]
